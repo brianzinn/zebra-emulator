@@ -1,0 +1,15 @@
+{
+  "name": "zebra-browser-print-emulator",
+  "version": "1.0.0",
+  "private": "true",
+  "description": "Zebra BrowserPrinter emulator",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ."
+  },
+  "author": "Brian Zinn",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.17.1"
+  }
+}
