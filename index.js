@@ -30,7 +30,7 @@ app.get('/available', (req, res) => {
 })
 
 app.post('/write', (req, res) => {
-  console.log('data:', req?.body?.data);
+  console.log('data:', (req && req.body) ? req.body.data : '"data" missing req.body');
   console.log('---------------------------------------\n')
   res.json({})
 })
