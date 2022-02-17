@@ -2,8 +2,10 @@ import express from 'express'
 import cors from 'cors'
 import fetch from 'node-fetch'
 
-const app = express();
+import * as dotenv from 'dotenv';
 
+const app = express();
+dotenv.config();
 app.use(cors());
 app.use(express.json({ type: '*/*' }));
 
@@ -33,19 +35,28 @@ app.get('/available', (req, res) => {
 app.post('/write', (req, res) => {
   console.log('data:', (req && req.body) ? req.body.data : '"data" missing req.body');
   console.log('---------------------------------------\n')
-  fetch('http://localhost:9101', { method: 'POST', body: '{"mode":"print","epl":"' + Buffer.from(req.body.data) + '"}' })
-    .catch((e) => {
-      // do nothing, keep the console clean
-    });
+  if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
+    const port = process.env.CHROME_EXTENSION_PORT ?? '9101';
+    // const payload = typeof req.body.data === 'string' ? req.body.data : Buffer.from(req.body.data);
+    fetch(`http://localhost:${port}`, { method: 'POST', body: '{"mode":"print","epl":"' + Buffer.from(req.body.data) + '"}' })
+      .catch((e) => {
+        // do nothing, keep the console clean
+      });
+    }
   res.json({})
 })
 
 const SERVER_PORT = 9100;
+const EXTENSION_PORT = process.env.CHROME_EXTENSION_PORT ?? '9101';
 app.listen(SERVER_PORT, () => {
   console.log(`\nBrowser Print Fake Server running on http://localhost:${SERVER_PORT}\n\n`)
   console.log('******************************************************************************')
-  console.log(
-    '  TIP: If you want to preview the label you can install the Zpl Printer\n  extension from the chrome web store and set it up to listen on port 9101'
-  )
+  if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
+    console.log(
+      '  TIP: If you want to preview the label you can install the Zpl Printer\n  extension from the chrome web store and set it up to listen on port ' + EXTENSION_PORT
+    )
+  } else {
+    console.log('Chrome extension support not enabled.');
+  }
   console.log('******************************************************************************\n')
 });
