@@ -10,4 +10,4 @@ Makes use of ES Modules which require Node v14 or greater.
 HTTP service on 9100
 HTTPS service on 9101 with provided SSL cert
 
-To build ne SSL keya nd cert files, use command `openssl req -nodes -new -x509 -days 7300 -keyout server.key -out server.cert`
+To build the SSL keys and cert files, use command `openssl req -nodes -new -x509 -days 7300 -keyout server.key -out server.cert`
