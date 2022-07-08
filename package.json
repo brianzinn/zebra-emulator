@@ -9,6 +9,9 @@
     "start": "node .",
     "startdev": "nodemon index.js"
   },
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "author": "Brian Zinn",
   "dependencies": {
     "cors": "^2.8.5",
