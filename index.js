@@ -23,6 +23,34 @@ app.get('/default', (req, res) => {
   })
 })
 
+app.post('/convert', (req, res) => {
+  // TODO: set content-type to "text/plain"?
+  // this is for PDF.  the other ones would work.  you should not need it.  see:
+  // https://developer.zebra.com/forum/25874
+  res.send('The format conversion attempted requires a licensing key and none was provided');
+})
+
+app.get('/config', (req, res) => {
+  res.json({
+    "application": {
+      "supportedConversions": {
+        "jpg": ["cpcl", "zpl", "kpl"],
+        "tif": ["cpcl", "zpl", "kpl"],
+        "pdf": ["cpcl", "zpl", "kpl"],
+        "bmp": ["cpcl", "zpl", "kpl"],
+        "pcx": ["cpcl", "zpl", "kpl"],
+        "gif": ["cpcl", "zpl", "kpl"],
+        "png": ["cpcl", "zpl", "kpl"],
+        "jpeg": ["cpcl", "zpl", "kpl"]
+      },
+      "version": "1.3.2.489",
+      "apiLevel": 5,
+      "buildNumber": 489,
+      "platform": "windows"
+    }
+  })
+})
+
 app.get('/available', (req, res) => {
   console.log('GET request for /available recieved')
   res.json({
@@ -51,7 +79,7 @@ app.post('/write', (req, res) => {
       .catch((e) => {
         // do nothing, keep the console clean
       });
-    }
+  }
   res.json({})
 })
 
@@ -73,14 +101,14 @@ https.createServer(option, app).listen(SERVER_PORT_SSL, () => {
     console.log(
       '  TIP: If you want to preview the label you can install the Zpl Printer\n  extension from the chrome web store and set it up to listen on port ' + EXTENSION_PORT
     )
-  } else { 
+  } else {
     console.log('Chrome extension support not enabled.');
   }
   console.log('******************************************************************************\n')
 });
 
 
-app.listen(SERVER_PORT,'127.0.0.1', () => {
+app.listen(SERVER_PORT, '127.0.0.1', () => {
   console.log(`\nBrowser Print Fake Server running on http://localhost:${SERVER_PORT}\n\n`)
   console.log('******************************************************************************')
   if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
