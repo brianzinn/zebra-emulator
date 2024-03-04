@@ -22,3 +22,6 @@ $ yarn start > out.log
 ```
 
 **NOTE:  Makes use of ES Modules which require Node v14 or greater.
+
+If you are working on a website - check out the browserprint-es module:
+[github.com/brianzinn/browserprint-es](https://github.com/brianzinn/browserprint-es)
