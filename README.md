@@ -5,7 +5,7 @@ Paper saver that emulates the service provided by `BrowserPrint` application (Ze
 The `BrowserPrint` service application sends the ZPL to the Zebra Printer from the browser and we are intercepting those calls and logging them and optionally sending to a browser extension to view in real time (without using a physical printer or paper).
 
 - This project logs what would be sent to the printer
-- You can upload to an online viewer such as [labelary](http://labelary.com/viewer.html) or better yet, if you install the [Zpl Printer Chrome browser extension](https://chrome.google.com/webstore/detail/zpl-printer/phoidlklenidapnijkabnfdgmadlcmjo?hl=en-US) and configure it to listen on port 9102. Once installed and turned on you will see the label(s) rendered in real time
+- You can upload to an online viewer such as [labelary](http://labelary.com/viewer.html) or better yet, if you install the [Zpl Printer Chrome browser extension](https://chrome.google.com/webstore/detail/zpl-printer/phoidlklenidapnijkabnfdgmadlcmjo?hl=en-US) (ChromeOS only) or [ZplPrinter Emulator](https://github.com/MrL0co/ZplPrinter/releases) (Standalone Electron for Windows/Linux/Mac) and configure it to listen on port 9102. Once installed and turned on you will see the label(s) rendered in real time.
 
 > `HTTP` service on 9100
 
