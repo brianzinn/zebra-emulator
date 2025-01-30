@@ -8,14 +8,7 @@ import * as dotenv from 'dotenv';
 const app = express();
 dotenv.config();
 app.use(cors());
-app.use(express.text({
-  type: 'text/plain',
-}))
-app.use(express.json({
-  type: (req) => {
-    return req.headers['content-type'] !== 'text/plain'
-  }
-}));
+app.use(express.json({ type: '*/*' }));
 
 const DEVICES_RESPONSE = {
   "deviceType": "printer",
@@ -111,25 +104,24 @@ app.post('/read', (req, res) => {
 app.post('/write', (req, res) => {
   console.log('POST request for /write recieved')
 
-  const body = JSON.parse(req.body ?? '{}');
+  const body = req.body;
 
-  const data = body.data;
-  console.log('data:', data ? data : '"data" missing req.body');
+  console.log('data:', body.data ? body.data : '"data" missing req.body');
   console.log('---------------------------------------\n');
 
-  if (data && data in FIXED_RESPONSES_MAP) {
-    // TODO: should we not call the chrome extension here?
-    console.log(`Response prepared for: ${data}`);
-    preparedResponses.push(FIXED_RESPONSES_MAP[data]);
-  }
-
-  else if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
-    const port = process.env.CHROME_EXTENSION_PORT ?? '9102';
-    // const payload = typeof req.body.data === 'string' ? req.body.data : Buffer.from(req.body.data);
-    fetch(`http://localhost:${port}`, { method: 'POST', body: '{"mode":"print","epl":"' + Buffer.from(req.body.data) + '"}' })
-      .catch((e) => {
-        // do nothing, keep the console clean
-      });
+  if (body && body.data) {
+    if (body.data in FIXED_RESPONSES_MAP) {
+      // TODO: should we not call the chrome extension here?
+      console.log(`Response prepared for: ${body.data}`);
+      preparedResponses.push(FIXED_RESPONSES_MAP[body.data]);
+    } else if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
+      const port = process.env.CHROME_EXTENSION_PORT ?? '9102';
+      // const payload = typeof req.body.data === 'string' ? req.body.data : Buffer.from(req.body.data);
+      fetch(`http://localhost:${port}`, { method: 'POST', body: '{"mode":"print","epl":"' + Buffer.from(body.data) + '"}' })
+        .catch((e) => {
+          // do nothing, keep the console clean
+        });
+    }
   }
   res.json({})
 })
