@@ -110,19 +110,20 @@ app.post('/read', (req, res) => {
 
 app.post('/write', (req, res) => {
   console.log('POST request for /write recieved')
-  const data = req?.body?.data;
+
+  const body = JSON.parse(req.body ?? '{}');
+
+  const data = body.data;
   console.log('data:', data ? data : '"data" missing req.body');
   console.log('---------------------------------------\n');
 
-  if(data) {
-    if(data in FIXED_RESPONSES_MAP) {
-      // TODO: should we not call the chrome extension here?
-      console.log(`Response prepared for: ${data}`);
-      preparedResponses.push(FIXED_RESPONSES_MAP[data]);
-    }
+  if (data && data in FIXED_RESPONSES_MAP) {
+    // TODO: should we not call the chrome extension here?
+    console.log(`Response prepared for: ${data}`);
+    preparedResponses.push(FIXED_RESPONSES_MAP[data]);
   }
 
-  if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
+  else if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
     const port = process.env.CHROME_EXTENSION_PORT ?? '9102';
     // const payload = typeof req.body.data === 'string' ? req.body.data : Buffer.from(req.body.data);
     fetch(`http://localhost:${port}`, { method: 'POST', body: '{"mode":"print","epl":"' + Buffer.from(req.body.data) + '"}' })
