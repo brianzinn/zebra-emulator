@@ -8,7 +8,14 @@ import * as dotenv from 'dotenv';
 const app = express();
 dotenv.config();
 app.use(cors());
-app.use(express.json({ type: '*/*' }));
+app.use(express.text({
+  type: 'text/plain',
+}))
+app.use(express.json({
+  type: (req) => {
+    return req.headers['content-type'] !== 'text/plain'
+  }
+}));
 
 app.get('/default', (req, res) => {
   console.log('GET request for /default recieved')
@@ -63,8 +70,32 @@ app.get('/available', (req, res) => {
   })
 })
 
+// From browser-print ES
+// this._paperOut = this.isFlagSet(5);
+// this._paused = this.isFlagSet(7);
+// this._headOpen = this.isFlagSet(43);
+// this._ribbonOut = this.isFlagSet(45);
+const STATUS_REQUEST = '~HQES'
+const STATUS_RESPONSE = `${String.fromCharCode([2])}
+
+  PRINTER STATUS                          
+ ERRORS:         0 00000000 00000000      
+ WARNINGS:       0 00000000 00000000      
+${String.fromCharCode([3])}`;
+
+const FIXED_RESPONSES_MAP = {
+  [STATUS_REQUEST]: STATUS_RESPONSE
+}
+
 app.post('/read', (req, res) => {
-  console.log('POST request for /read recieved')
+  if(req.headers['content-type'] === 'text/plain') {
+    if(req.body in FIXED_RESPONSES_MAP) {
+      res.status(200).send(FIXED_RESPONSES_MAP[req.body])
+      return;
+    } else {
+      console.log(`unexpected text/plain: '${req.body}'`);
+    }
+  }
   res.status(200).send();
 })
 
