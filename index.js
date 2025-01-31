@@ -10,17 +10,19 @@ dotenv.config();
 app.use(cors());
 app.use(express.json({ type: '*/*' }));
 
+const DEVICES_RESPONSE = {
+  "deviceType": "printer",
+  "uid": "Zebra ZP 500 (ZPL)",
+  "provider": "com.zebra.ds.webdriver.desktop.provider.DefaultDeviceProvider",
+  "name": "Zebra ZP 500 (ZPL)",
+  "connection": "driver",
+  "version": 3,
+  "manufacturer": "Zebra Technologies"
+};
+
 app.get('/default', (req, res) => {
   console.log('GET request for /default recieved')
-  res.json({
-    "deviceType": "printer",
-    "uid": "Zebra ZP 500 (ZPL)",
-    "provider": "com.zebra.ds.webdriver.desktop.provider.DefaultDeviceProvider",
-    "name": "Zebra ZP 500 (ZPL)",
-    "connection": "driver",
-    "version": 3,
-    "manufacturer": "Zebra Technologies"
-  })
+  res.status(200).json(DEVICES_RESPONSE)
 })
 
 app.post('/convert', (req, res) => {
@@ -63,22 +65,63 @@ app.get('/available', (req, res) => {
   })
 })
 
+// From browser-print ES
+// this._paperOut = this.isFlagSet(5);
+// this._paused = this.isFlagSet(7);
+// this._headOpen = this.isFlagSet(43);
+// this._ribbonOut = this.isFlagSet(45);
+const STATUS_REQUEST = '~HQES'
+const STATUS_RESPONSE = `${String.fromCharCode([2])}
+
+  PRINTER STATUS                          
+ ERRORS:         0 00000000 00000000      
+ WARNINGS:       0 00000000 00000000      
+${String.fromCharCode([3])}`;
+
+const FIXED_RESPONSES_MAP = {
+  [STATUS_REQUEST]: STATUS_RESPONSE
+}
+
+const preparedResponses = [];
+
 app.post('/read', (req, res) => {
-  console.log('POST request for /read recieved')
-  res.status(200).send();
+  // if(req.headers['content-type'] === 'text/plain') {
+  //   if(req.body in FIXED_RESPONSES_MAP) {
+  //     res.status(200).send(FIXED_RESPONSES_MAP[req.body])
+  //     return;
+  //   } else {
+  //     console.log(`unexpected text/plain: '${req.body}'`);
+  //   }
+  // }
+  if (preparedResponses.length !== 0) {
+    console.log('Returning prepared response');
+    res.status(200).send(preparedResponses.pop());
+  } else {
+    res.status(200).send();
+  }
 })
 
 app.post('/write', (req, res) => {
   console.log('POST request for /write recieved')
-  console.log('data:', (req && req.body) ? req.body.data : '"data" missing req.body');
-  console.log('---------------------------------------\n')
-  if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
-    const port = process.env.CHROME_EXTENSION_PORT ?? '9102';
-    // const payload = typeof req.body.data === 'string' ? req.body.data : Buffer.from(req.body.data);
-    fetch(`http://localhost:${port}`, { method: 'POST', body: '{"mode":"print","epl":"' + Buffer.from(req.body.data) + '"}' })
-      .catch((e) => {
-        // do nothing, keep the console clean
-      });
+
+  const body = req.body;
+
+  console.log('data:', body.data ? body.data : '"data" missing req.body');
+  console.log('---------------------------------------\n');
+
+  if (body && body.data) {
+    if (body.data in FIXED_RESPONSES_MAP) {
+      // TODO: should we not call the chrome extension here?
+      console.log(`Response prepared for: ${body.data}`);
+      preparedResponses.push(FIXED_RESPONSES_MAP[body.data]);
+    } else if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
+      const port = process.env.CHROME_EXTENSION_PORT ?? '9102';
+      // const payload = typeof req.body.data === 'string' ? req.body.data : Buffer.from(req.body.data);
+      fetch(`http://localhost:${port}`, { method: 'POST', body: '{"mode":"print","epl":"' + Buffer.from(body.data) + '"}' })
+        .catch((e) => {
+          // do nothing, keep the console clean
+        });
+    }
   }
   res.json({})
 })
