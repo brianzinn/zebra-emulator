@@ -1,85 +1,44 @@
 # zebra-emulator
-
-A standalone emulator for the **Zebra BrowserPrint** service. Instead of sending labels to a physical printer, it intercepts the browser's print calls, converts the image to ZPL, and saves both the original PNG and the generated ZPL to a local folder.
-
-No physical printer, no external emulator app, no extra configuration required.
+Paper saver that emulates the service provided by `BrowserPrint` application (Zebra ZPL).
 
 ---
+The `BrowserPrint` service application sends the ZPL to the Zebra Printer from the browser and we are intercepting those calls and logging them and optionally sending to a browser extension to view in real time (without using a physical printer or paper).
 
-## How it works
+- This project logs what would be sent to the printer
+- You can upload to an online viewer such as [labelary](http://labelary.com/viewer.html) or better yet, if you install the [Zpl Printer Chrome browser extension](https://chrome.google.com/webstore/detail/zpl-printer/phoidlklenidapnijkabnfdgmadlcmjo?hl=en-US) (ChromeOS only) or [ZplPrinter Emulator](https://github.com/MrL0co/ZplPrinter/releases) (Standalone Electron for Windows/Linux/Mac). Once installed and turned on you will see the label(s) rendered in real time.
 
-Web apps that use the [Zebra BrowserPrint](https://www.zebra.com/us/en/software/zebra-browser-print.html) library communicate with a local service on port `9100`. This project replaces that service:
+If you are using the ZplPrinter emulator, ensure to set the port to `9102` or match in your `.env` file.
+![Configuring the port](https://raw.githubusercontent.com/brianzinn/zebra-emulator/main/docs/zpl_printer_configure.png)
 
-1. The browser sends a PNG image to `/convert`
-2. The server converts the PNG → ZPL (using ACS encoding via `zpl-image`)
-3. Both files are saved to the `converted/` folder with an auto-incrementing index
-4. The ZPL string is returned to the browser so the BrowserPrint library completes normally
+> `HTTP` service on 9100
 
----
+> `HTTPS` service on 9101 (with provided SSL cert)
 
-## Requirements
-
-- Node.js >= 14
-
----
-
-## Setup
-
-```bash
-npm install
+To build the SSL keys and cert files, use command:
+```
+$ openssl req -nodes -new -x509 -days 7300 -keyout server.key -out server.cert
 ```
 
-Configure the port if needed (default is `9100`):
+If you are printing a lot at once it may overflow your terminal/prompt.  You can redirect to a file for easier searching/viewing:
+```bash
+$ yarn start > out.log
+```
+
+**NOTE:  Makes use of ES Modules which require Node v14 or greater.
+
+If you are working on a website - check out the browserprint-es module:
+[github.com/brianzinn/browserprint-es](https://github.com/brianzinn/browserprint-es)
+
+## Convert to ZPL and PNG
+If you want to run the server and convert the image to ZPL and PNG, you can use the following `.env` settings:
 
 ```env
-# .env
-PORT=9100
+CHROME_EXTENSION_ENABLED=false
+CHROME_EXTENSION_PORT=9102
+SERVER_PORT=9100
+SERVER_PORT_SSL=9101
+SAVE_CONVERTED=true
+SAVE_ZPL=true
 ```
 
----
-
-## Running
-
-```bash
-# production
-npm start
-
-# development (auto-restart on file changes)
-npm run startdev
-```
-
-The server starts on `http://localhost:9100`.
-
----
-
-## Output
-
-Every print job saves two files to the `converted/` folder:
-
-| File | Contents |
-|------|----------|
-| `converted/1.png` | Original PNG image sent by the browser |
-| `converted/1.zpl` | Generated ZPL label command |
-
-Files are numbered sequentially and never overwritten. The counter survives server restarts.
-
----
-
-## Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/default` | Returns the emulated Zebra ZP 500 device info |
-| `GET` | `/available` | Returns the list of available devices |
-| `GET` | `/config` | Returns supported image conversion formats |
-| `POST` | `/convert` | Converts a PNG blob to ZPL and saves both files |
-| `POST` | `/write` | Accepts ZPL write calls (no-op, returns success) |
-| `POST` | `/read` | Accepts printer read polls (returns empty) |
-
----
-
-## Notes
-
-- Requires **ES Modules** (Node v14+)
-- The BrowserPrint library runs a background heartbeat (`/write` + `/read`) as long as the browser page is open — this is normal and harmless
-- To view the generated ZPL labels, upload the `.zpl` file to [labelary.com/viewer.html](http://labelary.com/viewer.html)
+It will listen to the `/convert` endpoint to convert the image to ZPL and PNG and save them to the `converted` directory.

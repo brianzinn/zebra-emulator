@@ -1,12 +1,12 @@
 import express from 'express'
 import cors from 'cors'
+import fetch from 'node-fetch'
+import https from 'https'
 import fs from 'fs'
 import multer from 'multer'
 import { Jimp } from 'jimp'
 import zplImage from 'zpl-image'
 import * as dotenv from 'dotenv';
-
-dotenv.config();
 
 const { rgbaToACS } = zplImage;
 
@@ -19,7 +19,10 @@ const nextFileIndex = () => {
   return Math.max(...files.map(f => parseInt(f))) + 1;
 };
 
+dotenv.config();
+
 const app = express();
+
 app.use(cors());
 app.use((req, res, next) => {
   if (req.headers['content-type']?.includes('multipart/form-data')) {
@@ -39,16 +42,9 @@ const DEVICES_RESPONSE = {
 };
 
 app.get('/default', (req, res) => {
-  res.status(200).json(DEVICES_RESPONSE);
-});
-
-app.get('/available', (req, res) => {
-  res.json({
-    "deviceList": [
-      { "uid": "Zebra ZP 500 (ZPL)", "name": "Zebra ZP 500 (ZPL)" }
-    ]
-  });
-});
+  console.log('GET request for /default recieved')
+  res.status(200).json(DEVICES_RESPONSE)
+})
 
 app.get('/config', (req, res) => {
   res.json({
@@ -68,43 +64,146 @@ app.get('/config', (req, res) => {
       "buildNumber": 489,
       "platform": "windows"
     }
-  });
-});
+  })
+})
+
+app.get('/available', (req, res) => {
+  console.log('GET request for /available recieved')
+  res.json({
+    "deviceList": [
+      {
+        "uid": "Zebra ZP 500 (ZPL)",
+        "name": "Zebra ZP 500 (ZPL)"
+      }
+    ]
+  })
+})
+
+// From browser-print ES
+// this._paperOut = this.isFlagSet(5);
+// this._paused = this.isFlagSet(7);
+// this._headOpen = this.isFlagSet(43);
+// this._ribbonOut = this.isFlagSet(45);
+const STATUS_REQUEST = '~HQES'
+const STATUS_RESPONSE = `${String.fromCharCode([2])}
+
+  PRINTER STATUS                          
+ ERRORS:         0 00000000 00000000      
+ WARNINGS:       0 00000000 00000000      
+${String.fromCharCode([3])}`;
+
+const FIXED_RESPONSES_MAP = {
+  [STATUS_REQUEST]: STATUS_RESPONSE
+}
+
+const preparedResponses = [];
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.post('/convert', upload.single('blob'), async (req, res) => {
-  try {
-    const image = await Jimp.fromBuffer(req.file.buffer);
-    const { width, data } = image.bitmap;
+  if (process.env.SAVE_CONVERTED === 'true') {
+    try {
+      const image = await Jimp.fromBuffer(req.file.buffer);
+      const { width, data } = image.bitmap;
 
-    const rv = rgbaToACS(data, width, { black: 50 });
-    const zpl = `^XA^FO0,0^GFA,${rv.length},${rv.length},${rv.rowlen},${rv.acs}^XZ`;
+      const rv = rgbaToACS(data, width, { black: 50 });
+      const zpl = `^XA^FO0,0^GFA,${rv.length},${rv.length},${rv.rowlen},${rv.acs}^XZ`;
 
-    const idx = nextFileIndex();
-    fs.writeFileSync(`${CONVERTED_DIR}/${idx}.png`, req.file.buffer);
-    fs.writeFileSync(`${CONVERTED_DIR}/${idx}.zpl`, zpl);
-    console.log(`[${idx}] Saved ${image.bitmap.width}x${image.bitmap.height} PNG + ZPL (${zpl.length} bytes) → converted/${idx}.*`);
+      const saveZpl = process.env.SAVE_ZPL !== 'false';
+      const idx = nextFileIndex();
+      fs.writeFileSync(`${CONVERTED_DIR}/${idx}.png`, req.file.buffer);
+      if (saveZpl) fs.writeFileSync(`${CONVERTED_DIR}/${idx}.zpl`, zpl);
+      console.log(`[${idx}] Saved ${image.bitmap.width}x${image.bitmap.height} PNG${saveZpl ? ' + ZPL' : ''} (${zpl.length} bytes) → converted/${idx}.*`);
 
-    res.status(200).json(zpl);
-  } catch (err) {
-    console.error('Error in /convert:', err);
-    res.status(500).send('Conversion error: ' + err.message);
+      res.status(200).json(zpl);
+    } catch (err) {
+      console.error('Error in /convert:', err);
+      res.status(500).send('Conversion error: ' + err.message);
+    }
+  } else {
+    // TODO: set content-type to "text/plain"?
+    // this is for PDF.  the other ones would work.  you should not need it.  see:
+    // https://developer.zebra.com/forum/25874
+    res.send('The format conversion attempted requires a licensing key and none was provided');
   }
-});
+})
 
-// Always return empty — the library interprets an empty read as "printer idle / job done"
 app.post('/read', (req, res) => {
-  res.status(200).send();
-});
+  // if(req.headers['content-type'] === 'text/plain') {
+  //   if(req.body in FIXED_RESPONSES_MAP) {
+  //     res.status(200).send(FIXED_RESPONSES_MAP[req.body])
+  //     return;
+  //   } else {
+  //     console.log(`unexpected text/plain: '${req.body}'`);
+  //   }
+  // }
+  if (preparedResponses.length !== 0) {
+    console.log('Returning prepared response');
+    res.status(200).send(preparedResponses.pop());
+  } else {
+    res.status(200).send();
+  }
+})
 
-// Always return success — no status queueing to avoid write/read feedback loops
 app.post('/write', (req, res) => {
-  res.json({});
+  console.log('POST request for /write recieved')
+
+  const body = req.body;
+
+  console.log('data:', body.data ? body.data : '"data" missing req.body');
+  console.log('---------------------------------------\n');
+
+  if (body && body.data) {
+    if (body.data in FIXED_RESPONSES_MAP) {
+      // TODO: should we not call the chrome extension here?
+      console.log(`Response prepared for: ${body.data}`);
+      preparedResponses.push(FIXED_RESPONSES_MAP[body.data]);
+    } else if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
+      const port = process.env.CHROME_EXTENSION_PORT ?? '9102';
+      // const payload = typeof req.body.data === 'string' ? req.body.data : Buffer.from(req.body.data);
+      fetch(`http://localhost:${port}`, { method: 'POST', body: '{"mode":"print","epl":"' + Buffer.from(body.data) + '"}' })
+        .catch((e) => {
+          // do nothing, keep the console clean
+        });
+    }
+  }
+  res.json({})
+})
+
+const SERVER_PORT = process.env.SERVER_PORT ?? '9100';
+const SERVER_PORT_SSL = process.env.SERVER_PORT_SSL ?? '9101';
+const EXTENSION_PORT = process.env.CHROME_EXTENSION_PORT ?? '9101';
+
+//SSL key and cert
+var option = {
+  key: fs.readFileSync('ssl/server.key'),
+  cert: fs.readFileSync('ssl/server.cert')
+};
+
+
+https.createServer(option, app).listen(SERVER_PORT_SSL, () => {
+  console.log(`\nBrowser Print Fake Server running on https://localhost:${SERVER_PORT}\n\n`)
+  console.log('******************************************************************************')
+  if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
+    console.log(
+      '  TIP: If you want to preview the label you can install the Zpl Printer\n  extension from the chrome web store and set it up to listen on port ' + EXTENSION_PORT
+    )
+  } else {
+    console.log('Chrome extension support not enabled.');
+  }
+  console.log('******************************************************************************\n')
 });
 
-const PORT = process.env.PORT || 9100;
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`\nZebra emulator running on http://localhost:${PORT}`);
-  console.log(`Labels saved to: ${CONVERTED_DIR}/\n`);
+
+app.listen(SERVER_PORT, '127.0.0.1', () => {
+  console.log(`\nBrowser Print Fake Server running on http://localhost:${SERVER_PORT}\n\n`)
+  console.log('******************************************************************************')
+  if (process.env.CHROME_EXTENSION_ENABLED === String(true)) {
+    console.log(
+      '  TIP: If you want to preview the label you can install the Zpl Printer\n  extension from the chrome web store and set it up to listen on port ' + EXTENSION_PORT
+    )
+  } else {
+    console.log('Chrome extension support not enabled.');
+  }
+  console.log('******************************************************************************\n')
 });
