@@ -28,3 +28,17 @@ $ yarn start > out.log
 
 If you are working on a website - check out the browserprint-es module:
 [github.com/brianzinn/browserprint-es](https://github.com/brianzinn/browserprint-es)
+
+## Convert to ZPL and PNG
+If you want to run the server and convert the image to ZPL and PNG, you can use the following `.env` settings:
+
+```env
+CHROME_EXTENSION_ENABLED=false
+CHROME_EXTENSION_PORT=9102
+SERVER_PORT=9100
+SERVER_PORT_SSL=9101
+SAVE_CONVERTED=true
+SAVE_ZPL=true
+```
+
+It will listen to the `/convert` endpoint to convert the image to ZPL and PNG and save them to the `converted` directory.

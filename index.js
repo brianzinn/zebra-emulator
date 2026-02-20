@@ -3,12 +3,33 @@ import cors from 'cors'
 import fetch from 'node-fetch'
 import https from 'https'
 import fs from 'fs'
+import multer from 'multer'
+import { Jimp } from 'jimp'
+import zplImage from 'zpl-image'
 import * as dotenv from 'dotenv';
 
-const app = express();
+const { rgbaToACS } = zplImage;
+
+const CONVERTED_DIR = './converted';
+if (!fs.existsSync(CONVERTED_DIR)) fs.mkdirSync(CONVERTED_DIR);
+
+const nextFileIndex = () => {
+  const files = fs.readdirSync(CONVERTED_DIR).filter(f => /^\d+\.png$/.test(f));
+  if (files.length === 0) return 1;
+  return Math.max(...files.map(f => parseInt(f))) + 1;
+};
+
 dotenv.config();
+
+const app = express();
+
 app.use(cors());
-app.use(express.json({ type: '*/*' }));
+app.use((req, res, next) => {
+  if (req.headers['content-type']?.includes('multipart/form-data')) {
+    return next();
+  }
+  express.json({ type: '*/*' })(req, res, next);
+});
 
 const DEVICES_RESPONSE = {
   "deviceType": "printer",
@@ -23,13 +44,6 @@ const DEVICES_RESPONSE = {
 app.get('/default', (req, res) => {
   console.log('GET request for /default recieved')
   res.status(200).json(DEVICES_RESPONSE)
-})
-
-app.post('/convert', (req, res) => {
-  // TODO: set content-type to "text/plain"?
-  // this is for PDF.  the other ones would work.  you should not need it.  see:
-  // https://developer.zebra.com/forum/25874
-  res.send('The format conversion attempted requires a licensing key and none was provided');
 })
 
 app.get('/config', (req, res) => {
@@ -84,6 +98,36 @@ const FIXED_RESPONSES_MAP = {
 
 const preparedResponses = [];
 
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post('/convert', upload.single('blob'), async (req, res) => {
+  if (process.env.SAVE_CONVERTED === 'true') {
+    try {
+      const image = await Jimp.fromBuffer(req.file.buffer);
+      const { width, data } = image.bitmap;
+
+      const rv = rgbaToACS(data, width, { black: 50 });
+      const zpl = `^XA^FO0,0^GFA,${rv.length},${rv.length},${rv.rowlen},${rv.acs}^XZ`;
+
+      const saveZpl = process.env.SAVE_ZPL !== 'false';
+      const idx = nextFileIndex();
+      fs.writeFileSync(`${CONVERTED_DIR}/${idx}.png`, req.file.buffer);
+      if (saveZpl) fs.writeFileSync(`${CONVERTED_DIR}/${idx}.zpl`, zpl);
+      console.log(`[${idx}] Saved ${image.bitmap.width}x${image.bitmap.height} PNG${saveZpl ? ' + ZPL' : ''} (${zpl.length} bytes) → converted/${idx}.*`);
+
+      res.status(200).json(zpl);
+    } catch (err) {
+      console.error('Error in /convert:', err);
+      res.status(500).send('Conversion error: ' + err.message);
+    }
+  } else {
+    // TODO: set content-type to "text/plain"?
+    // this is for PDF.  the other ones would work.  you should not need it.  see:
+    // https://developer.zebra.com/forum/25874
+    res.send('The format conversion attempted requires a licensing key and none was provided');
+  }
+})
+
 app.post('/read', (req, res) => {
   // if(req.headers['content-type'] === 'text/plain') {
   //   if(req.body in FIXED_RESPONSES_MAP) {
@@ -126,8 +170,8 @@ app.post('/write', (req, res) => {
   res.json({})
 })
 
-const SERVER_PORT = 9100;
-const SERVER_PORT_SSL = 9101;
+const SERVER_PORT = process.env.SERVER_PORT ?? '9100';
+const SERVER_PORT_SSL = process.env.SERVER_PORT_SSL ?? '9101';
 const EXTENSION_PORT = process.env.CHROME_EXTENSION_PORT ?? '9101';
 
 //SSL key and cert
