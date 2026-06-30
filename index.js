@@ -31,6 +31,12 @@ app.get('/available', (req, res) => {
         "uid": "Zebra ZP 500 (ZPL)",
         "name": "Zebra ZP 500 (ZPL)"
       }
+    ],
+    "printer": [
+      {
+        "uid": "Zebra ZP 500 (ZPL)",
+        "name": "Zebra ZP 500 (ZPL)"
+      }
     ]
   })
 })
